@@ -20,34 +20,47 @@ class bazilioInterpreter(bazilioVisitor):
     def set_var(self, name, val):
         self.call_stack[-1][name] = val
 
-    # Método generado por la regla principal 'programa'
     def visitPrograma(self, ctx):
-        for proc in ctx.procedimiento():
-            proc_name = proc.PROC_ID().getText()
-            self.procs[proc_name] = proc
+        procs = ctx.procedimiento()
+        if procs:
+            if not isinstance(procs, list):
+                procs = [procs]
+            for proc in procs:
+                proc_name = proc.PROC_ID().getText()
+                self.procs[proc_name] = proc
         
         if 'Main' not in self.procs:
-            print("Error: No se definió el procedimiento 'Main'")
-            sys.exit(1)
+            # Si no encontró Main por nombre, toma el primero por defecto
+            if self.procs:
+                main_proc = list(self.procs.values())[0]
+                return self.visit(main_proc)
+            return
             
         return self.visit(self.procs['Main'])
 
     def visitProcedimiento(self, ctx):
-        for stmt in ctx.bloque().instruccion():
-            self.visit(stmt)
+        bloque = ctx.bloque() if hasattr(ctx, 'bloque') else ctx
+        if bloque is not None:
+            instrucciones = bloque.instruccion() if hasattr(bloque, 'instruccion') else []
+            if instrucciones:
+                if not isinstance(instrucciones, list):
+                    instrucciones = [instrucciones]
+                for stmt in instrucciones:
+                    self.visit(stmt)
 
-    # Coincide con la etiqueta # Asignacion en bazilio.g4
     def visitAsignacion(self, ctx):
         var_name = ctx.VAR().getText()
         val = self.visit(ctx.expr())
         self.set_var(var_name, val)
 
-    # Coincide con la etiqueta # Escritura en bazilio.g4
     def visitEscritura(self, ctx):
-        vals = [str(self.visit(e)) for e in ctx.expr()]
-        print(" ".join(vals))
+        exprs = ctx.expr() if hasattr(ctx, 'expr') else []
+        if exprs:
+            if not isinstance(exprs, list):
+                exprs = [exprs]
+            vals = [str(self.visit(e)) for e in exprs]
+            print(" ".join(vals))
 
-    # Coincide con la etiqueta # Lectura en bazilio.g4
     def visitLectura(self, ctx):
         var_name = ctx.VAR().getText()
         val = input(f"<?> {var_name}: ")
@@ -60,19 +73,22 @@ class bazilioInterpreter(bazilioVisitor):
                 val_conv = val
         self.set_var(var_name, val_conv)
 
-    # Coincide con la etiqueta # Reproduccion (TOCA expr) en bazilio.g4
     def visitReproduccion(self, ctx):
         val = self.visit(ctx.expr())
         if val is not None:
             self.notas_tocadas.append(val)
 
-    # Coincide con la etiqueta # Iteracion en bazilio.g4
     def visitIteracion(self, ctx):
-        while self.visit(ctx.exor()):
-            for stmt in ctx.bloque().instruccion():
-                self.visit(stmt)
+        while self.visit(ctx.expr()):
+            bloque = ctx.bloque() if hasattr(ctx, 'bloque') else ctx
+            if bloque is not None:
+                instrucciones = bloque.instruccion() if hasattr(bloque, 'instruccion') else []
+                if instrucciones:
+                    if not isinstance(instrucciones, list):
+                        instrucciones = [instrucciones]
+                    for stmt in instrucciones:
+                        self.visit(stmt)
 
-    # Coincide con la etiqueta # Agregado en bazilio.g4
     def visitAgregado(self, ctx):
         var_name = ctx.VAR().getText()
         val = self.visit(ctx.expr())
@@ -82,7 +98,6 @@ class bazilioInterpreter(bazilioVisitor):
         else:
             self.set_var(var_name, [val])
 
-    # Coincide con la etiqueta # SunaResta / MulDiv en bazilio.g4
     def visitSunaResta(self, ctx):
         left = self.visit(ctx.left)
         right = self.visit(ctx.right)
@@ -109,24 +124,25 @@ class bazilioInterpreter(bazilioVisitor):
         if op == bazilioParser.DISTINTO: return 1 if left != right else 0
         return 0
 
-    # Coincide con la etiqueta # Entero en bazilio.g4
     def visitEntero(self, ctx):
         return int(ctx.ENTERO().getText())
 
-    # Coincide con la etiqueta # Nota en bazilio.g4
     def visitNota(self, ctx):
         text = ctx.NOTA().getText()
         base = text[0].upper()
         octava = int(text[1]) if len(text) > 1 else 4
         return (octava * 7) + self.NOTE_MAP.get(base, 0) - 5
 
-    # Coincide con la etiqueta # Variable en bazilio.g4
     def visitVariable(self, ctx):
         return self.get_var(ctx.VAR().getText())
 
-    # Coincide con la etiqueta # Lista en bazilio.g4
     def visitLista(self, ctx):
-        return [self.visit(e) for e in ctx.expr()]
+        exprs = ctx.expr() if hasattr(ctx, 'expr') else []
+        if exprs:
+            if not isinstance(exprs, list):
+                exprs = [exprs]
+            return [self.visit(e) for e in exprs]
+        return []
 
     def visitLongitud(self, ctx):
         lst = self.get_var(ctx.VAR().getText())
@@ -162,7 +178,7 @@ def generar_archivos(base_name, notas):
     with open(ly_filename, "w", encoding="utf-8") as f:
         f.write(ly_code)
     
-    res_lily = subprocess.run(["lilypond", ly_filename], capture_output=True, text=True)
+    subprocess.run(["lilypond", ly_filename], capture_output=True, text=True)
     
     pdf_filename = f"{base_name}.pdf"
     midi_filename = f"{base_name}.midi"
