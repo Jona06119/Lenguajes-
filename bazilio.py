@@ -32,19 +32,18 @@ class bazilioInterpreter(bazilioVisitor):
             
         return self.visit(self.procs['Main'])
 
-    def visitStmtAsigna(self, ctx):
+    def visitAsignacion(self, ctx):
         var_name = ctx.VAR().getText()
         val = self.visit(ctx.expr())
         self.set_var(var_name, val)
 
-    def visitStmtEscribe(self, ctx):
+    def visitEscritura(self, ctx):
         vals = [str(self.visit(e)) for e in ctx.exprList().expr()]
         print(" ".join(vals))
 
-    def visitStmtLee(self, ctx):
+    def visitLectura(self, ctx):
         var_name = ctx.VAR().getText()
         val = input(f"<?> {var_name}: ")
-        # Conversión automática a entero si es numérico, de lo contrario texto
         try:
             val_conv = int(val)
         except ValueError:
@@ -54,16 +53,16 @@ class bazilioInterpreter(bazilioVisitor):
                 val_conv = val
         self.set_var(var_name, val_conv)
 
-    def visitStmtToca(self, ctx):
+    def visitReproduccion(self, ctx):  # <-- Coincide con # Reproduccion en el .g4
         val = self.visit(ctx.expr())
         self.notas_tocadas.append(val)
 
-    def visitStmtMientras(self, ctx):
+    def visitIteracion(self, ctx):   # <-- Coincide con # Iteracion en el .g4
         while self.visit(ctx.expr()):
             for stmt in ctx.stmt():
                 self.visit(stmt)
 
-    def visitStmtAgrega(self, ctx):
+    def visitAgregado(self, ctx):    # <-- Coincide con # Agregado en el .g4
         var_name = ctx.VAR().getText()
         val = self.visit(ctx.expr())
         lst = self.get_var(var_name)
@@ -71,7 +70,6 @@ class bazilioInterpreter(bazilioVisitor):
             lst.append(val)
         else:
             self.set_var(var_name, [val])
-
     def visitExprOpAdd(self, ctx):
         left = self.visit(ctx.left)
         right = self.visit(ctx.right)
