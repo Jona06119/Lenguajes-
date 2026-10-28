@@ -175,17 +175,21 @@ def index():
         nombre_cancion = request.form.get("nombre_cancion", "mi_melodia").strip()
         codigo = request.form.get("codigo", "").strip()
         
-        # --- ENVUELVE AUTOMÁTICAMENTE LAS NOTAS SI EL USUARIO NO PUSO LA ESTRUCTURA ---
-        if codigo and not codigo.upper().startswith("PROC"):
-            lineas = [l.strip() for l in codigo.splitlines() if l.strip()]
-            instrucciones = []
-            for l in lineas:
-                if not l.upper().startswith("TOCA"):
-                    instrucciones.append(f"    TOCA {l}")
-                else:
-                    instrucciones.append(f"    {l}")
-            codigo = "PROC Main\nINICIO\n" + "\n".join(instrucciones) + "\nFIN"
-        # --------------------------------------------------------------------------
+        # --- PERMITE INGRESAR SOLO NOTAS DE MANERA HORIZONTAL O VERTICAL ---
+        if codigo:
+            # Si el usuario no puso la estructura de Bazilio, la construimos automáticamente
+            if not codigo.upper().startswith("PROC"):
+                # Separamos por saltos de línea, espacios o comas para leer todas las notas
+                import re
+                notas_ingresadas = re.split(r'[\s,]+', codigo)
+                notas_ingresadas = [n for n in notas_ingresadas if n]
+                
+                instrucciones = []
+                for nota in notas_ingresadas:
+                    instrucciones.append(f"    TOCA {nota}")
+                
+                codigo = "PROC Main\nINICIO\n" + "\n".join(instrucciones) + "\nFIN"
+        # ------------------------------------------------------------------
 
         # Rutas de salida directas en la carpeta static/
         base_path = os.path.join(STATIC_DIR, nombre_cancion)
@@ -196,7 +200,7 @@ def index():
             lexer = bazilioLexer(input_stream)
             stream = CommonTokenStream(lexer)
             parser = bazilioParser(stream)
-            tree = parser.programa()  # Regla principal en minúscula como en tu gramática g4
+            tree = parser.programa()
             
             interpreter = bazilioInterpreter()
             interpreter.visit(tree)
@@ -213,7 +217,7 @@ def index():
                 
                 mensaje_exito = f"Archivos generados correctamente para '{nombre_cancion}'"
             else:
-                error = "El código se ejecutó, pero no se detectaron notas musicales con la instrucción TOCA."
+                error = "El código se ejecutó, pero no se detectaron notas musicales."
 
         except Exception as e:
             error = f"Error al interpretar o compilar:\n{str(e)}"
