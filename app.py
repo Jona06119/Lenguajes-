@@ -1,14 +1,14 @@
 import os
 import sys
+import time
+import re
 from flask import Flask, render_template_string, request, url_for
 from antlr4 import InputStream, CommonTokenStream
 
-# Importación exacta con minúsculas para que coincida con bazilio.py
 from bazilio import bazilioLexer, bazilioParser, bazilioInterpreter, generar_archivos
 
 app = Flask(__name__)
 
-# Directorio de archivos estáticos
 STATIC_DIR = os.path.join(os.path.dirname(__file__), 'static')
 os.makedirs(STATIC_DIR, exist_ok=True)
 
@@ -50,7 +50,7 @@ INDEX_HTML = """
             box-sizing: border-box; 
             margin-bottom: 20px; 
         }
-        textarea { height: 120px; font-family: monospace; resize: vertical; }
+        textarea { height: 100px; font-family: monospace; resize: vertical; }
         input[type="text"]:focus, textarea:focus { border-color: #007bff; outline: none; }
         .btn { 
             background: #222; 
@@ -75,7 +75,6 @@ INDEX_HTML = """
             font-size: 14px; 
             text-align: center;
         }
-        /* Contenedor horizontal para audio y PDF */
         .results-row {
             display: flex;
             align-items: center;
@@ -123,8 +122,8 @@ INDEX_HTML = """
             <label>Nombre de la cancion:</label>
             <input type="text" name="nombre_cancion" value="{{ nombre_cancion or 'mi_melodia' }}" required>
             
-            <label>Escribe tus notas (ej: C4, D4, E4):</label>
-            <textarea name="codigo" placeholder="Main&#10;{&#10;    TOCA C4&#10;    TOCA D4&#10;}" required>{{ codigo or '' }}</textarea>
+            <label>Escribe tus notas:</label>
+            <textarea name="codigo" placeholder="C4 D4 E4 F4" required>{{ codigo or '' }}</textarea>
             
             <button type="submit" class="btn">Convertir y Generar</button>
         </form>
@@ -168,29 +167,28 @@ def index():
     error = None
     audio_file = None
     pdf_file = None
-    import time
     timestamp = int(time.time())
 
     if request.method == "POST":
         nombre_cancion = request.form.get("nombre_cancion", "mi_melodia").strip()
-        codigo = request.form.get("codigo", "").strip()
-        
-        # Envoltura automática si el usuario solo pone notas sueltas
-        if codigo and not codigo.upper().startswith("MAIN"):
-            import re
-            notas_ingresadas = re.split(r'[\s,]+', codigo)
-            notas_ingresadas = [n for n in notas_ingresadas if n]
-            
-            instrucciones = []
-            for nota in notas_ingresadas:
-                instrucciones.append(f"    TOCA {nota}")
-            
-            codigo = "Main\n{\n" + "\n".join(instrucciones) + "\n}"
-
-        base_path = os.path.join(STATIC_DIR, nombre_cancion)
+        codigo_usuario = request.form.get("codigo", "").strip()
+        codigo = codigo_usuario
         
         try:
-            input_stream = InputStream(codigo)
+            # Transformamos automáticamente las notas horizontales a la estructura que requiere el analizador
+            if codigo_usuario:
+                notas_ingresadas = re.split(r'[\s,]+', codigo_usuario)
+                notas_ingresadas = [n for n in notas_ingresadas if n]
+                
+                instrucciones = []
+                for nota in notas_ingresadas:
+                    instrucciones.append(f"    TOCA {nota}")
+                
+                codigo_procesado = "Main\n{\n" + "\n".join(instrucciones) + "\n}"
+            else:
+                codigo_procesado = ""
+
+            input_stream = InputStream(codigo_procesado)
             lexer = bazilioLexer(input_stream)
             stream = CommonTokenStream(lexer)
             parser = bazilioParser(stream)
@@ -200,6 +198,7 @@ def index():
             interpreter.visit(tree)
             
             if interpreter.notas_tocadas:
+                base_path = os.path.join(STATIC_DIR, nombre_cancion)
                 generar_archivos(base_path, interpreter.notas_tocadas)
                 
                 if os.path.exists(f"{base_path}.wav"):
