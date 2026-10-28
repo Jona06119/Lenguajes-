@@ -2,11 +2,11 @@ import sys
 import os
 import subprocess
 from antlr4 import *
-from BazilioLexer import BazilioLexer
+from bazilioLexer import bazilioLexer
 from bazilioParser import bazilioParser
 from bazilioVisitor import bazilioVisitor
 
-class BazilioInterpreter(bazilioVisitor):
+class bazilioInterpreter(bazilioVisitor):
     def __init__(self):
         self.procs = {}
         self.call_stack = [{}]  # Pila de entornos de variables locales por ámbito
@@ -188,12 +188,12 @@ if __name__ == "__main__":
     base_name = os.path.splitext(bzl_file)[0]
     
     input_stream = FileStream(bzl_file, encoding='utf-8')
-    lexer = BazilioLexer(input_stream)
+    lexer = bazilioLexer(input_stream)
     stream = CommonTokenStream(lexer)
     parser = bazilioParser(stream)
     tree = parser.program()
     
-    interpreter = BazilioInterpreter()
+    interpreter = bazilioInterpreter()
     interpreter.visit(tree)
     
     if interpreter.notas_tocadas:
