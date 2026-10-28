@@ -1,0 +1,623 @@
+<!DOCTYPE html>
+<html lang="es" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Creador de Partituras Bazilio</title>
+    
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        bazilio: {
+                            base: '#0b0f17',
+                            card: '#111827',
+                            border: '#1f2937',
+                            accent: '#22c55e',
+                            accentHover: '#16a34a'
+                        }
+                    },
+                    fontFamily: {
+                        mono: ['JetBrains Mono', 'Fira Code', 'Courier New', 'monospace']
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- VexFlow para renderizado vectorial de partituras -->
+    <script src="https://cdn.jsdelivr.net/npm/vexflow@4.2.2/build/cjs/vexflow.js"></script>
+    <!-- html2pdf.js para exportar la hoja de trabajo a PDF -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
+    <style>
+        body {
+            background-color: #0b0f17;
+            color: #f3f4f6;
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+        }
+
+        /* Estilos específicos para la hoja limpia del PDF */
+        .pdf-page-wrapper {
+            background-color: #ffffff !important;
+            color: #000000 !important;
+            width: 100%;
+            max-width: 750px;
+            margin: 0 auto;
+            box-sizing: border-box;
+        }
+
+        .vexflow-line {
+            width: 100%;
+            display: flex;
+            justify-content: center;
+        }
+
+        .vexflow-line svg {
+            display: block;
+            margin: 0 auto;
+        }
+
+        /* Scrollbar personalizado */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #111827;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #374151;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #4b5563;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col bg-[#0b0f17] text-gray-100 antialiased">
+
+    <!-- Header / Barra Superior -->
+    <header class="border-b border-gray-800 bg-[#0f172a]/90 backdrop-blur sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <div class="p-2 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-emerald-400">
+                    <i data-lucide="music" class="w-6 h-6"></i>
+                </div>
+                <div>
+                    <h1 class="font-bold text-lg tracking-tight bg-gradient-to-r from-emerald-400 to-teal-200 bg-clip-text text-transparent">
+                        Bazilio Studio
+                    </h1>
+                    <p class="text-xs text-gray-400 hidden sm:block">Partituras con Saltos de Sistema y Exportación PDF (.bzl)</p>
+                </div>
+            </div>
+
+            <!-- Controles de Audio y Exportación -->
+            <div class="flex items-center space-x-2 sm:space-x-3">
+                <button id="btnPlay" onclick="playSequence()" class="flex items-center space-x-2 bg-emerald-600 hover:bg-emerald-500 text-white px-3.5 py-2 rounded-xl font-medium text-sm transition-all shadow-lg shadow-emerald-900/30 active:scale-95">
+                    <i data-lucide="play" class="w-4 h-4 fill-current"></i>
+                    <span>Reproducir</span>
+                </button>
+                <button id="btnStop" onclick="stopPlayback()" class="flex items-center space-x-2 bg-gray-800 hover:bg-gray-700 text-gray-300 border border-gray-700 px-3 py-2 rounded-xl font-medium text-sm transition-all active:scale-95">
+                    <i data-lucide="square" class="w-4 h-4"></i>
+                    <span class="hidden sm:inline">Detener</span>
+                </button>
+                <div class="h-6 w-px bg-gray-800 my-auto"></div>
+                <button onclick="exportToPDF()" class="flex items-center space-x-2 bg-rose-600/20 border border-rose-500/30 hover:bg-rose-600/30 text-rose-300 px-3 py-2 rounded-xl font-medium text-sm transition-all active:scale-95">
+                    <i data-lucide="file-down" class="w-4 h-4"></i>
+                    <span class="hidden sm:inline">Descargar</span> PDF
+                </button>
+                <button onclick="exportBZL()" class="flex items-center space-x-2 bg-teal-600/20 border border-teal-500/30 hover:bg-teal-600/30 text-teal-300 px-3 py-2 rounded-xl font-medium text-sm transition-all active:scale-95">
+                    <i data-lucide="download" class="w-4 h-4"></i>
+                    <span>Exportar .bzl</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Panel Principal -->
+    <main class="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+        <!-- Columna Izquierda: Selector de Notas y Octavas (5 Cols) -->
+        <div class="lg:col-span-5 space-y-6 flex flex-col">
+
+            <!-- Selector de Notas Interactivo -->
+            <div class="bg-gray-900/80 border border-gray-800 rounded-2xl p-5 shadow-xl space-y-5">
+                
+                <div class="flex items-center justify-between border-b border-gray-800 pb-3">
+                    <h2 class="text-sm font-semibold uppercase tracking-wider text-gray-300 flex items-center gap-2">
+                        <i data-lucide="sliders" class="w-4 h-4 text-emerald-400"></i> Agregar Notas
+                    </h2>
+                    <span class="text-xs text-emerald-400 font-mono font-bold bg-emerald-500/10 px-2 py-1 rounded-lg border border-emerald-500/20">
+                        Octava: <span id="octaveDisplay">4</span>
+                    </span>
+                </div>
+
+                <!-- Selector de Octavas (0 a 8) -->
+                <div>
+                    <label class="block text-xs font-medium text-gray-400 mb-2">Seleccionar Octava (Rango Bazilio: 0 a 8)</label>
+                    <div class="grid grid-cols-9 gap-1 bg-gray-950 p-1.5 rounded-xl border border-gray-800 text-xs">
+                        <button onclick="setOctave(0)" id="oct0" class="oct-btn py-1.5 rounded-lg hover:bg-gray-800 text-gray-400 transition-all">0</button>
+                        <button onclick="setOctave(1)" id="oct1" class="oct-btn py-1.5 rounded-lg hover:bg-gray-800 text-gray-400 transition-all">1</button>
+                        <button onclick="setOctave(2)" id="oct2" class="oct-btn py-1.5 rounded-lg hover:bg-gray-800 text-gray-400 transition-all">2</button>
+                        <button onclick="setOctave(3)" id="oct3" class="oct-btn py-1.5 rounded-lg hover:bg-gray-800 text-gray-400 transition-all">3</button>
+                        <button onclick="setOctave(4)" id="oct4" class="oct-btn py-1.5 rounded-lg bg-emerald-600 text-white font-bold transition-all shadow">4</button>
+                        <button onclick="setOctave(5)" id="oct5" class="oct-btn py-1.5 rounded-lg hover:bg-gray-800 text-gray-400 transition-all">5</button>
+                        <button onclick="setOctave(6)" id="oct6" class="oct-btn py-1.5 rounded-lg hover:bg-gray-800 text-gray-400 transition-all">6</button>
+                        <button onclick="setOctave(7)" id="oct7" class="oct-btn py-1.5 rounded-lg hover:bg-gray-800 text-gray-400 transition-all">7</button>
+                        <button onclick="setOctave(8)" id="oct8" class="oct-btn py-1.5 rounded-lg hover:bg-gray-800 text-gray-400 transition-all">8</button>
+                    </div>
+                </div>
+
+                <!-- Botones de Notas -->
+                <div>
+                    <label class="block text-xs font-medium text-gray-400 mb-2">Notas Diatónicas</label>
+                    <div class="grid grid-cols-7 gap-2" id="noteButtonsGrid">
+                        <!-- Generado por JS -->
+                    </div>
+                </div>
+
+                <!-- Entrada Manual -->
+                <div class="pt-3 border-t border-gray-800">
+                    <label class="block text-xs font-medium text-gray-400 mb-2">Agregar Nota Manual (Ej: C4, A3, F5)</label>
+                    <div class="flex gap-2">
+                        <input type="text" id="manualNoteInput" placeholder="Ej: C4" class="bg-gray-950 border border-gray-700 text-gray-100 rounded-xl px-3 py-2 text-sm w-full font-mono focus:outline-none focus:border-emerald-500 uppercase">
+                        <button onclick="addManualNote()" class="bg-gray-800 hover:bg-gray-700 text-gray-200 border border-gray-700 px-4 py-2 rounded-xl text-sm font-medium transition-all active:scale-95 flex items-center gap-1">
+                            <i data-lucide="plus" class="w-4 h-4"></i> Añadir
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Estructura del Código Bazilio -->
+                <div class="pt-3 border-t border-gray-800 space-y-3">
+                    <h3 class="text-xs font-semibold uppercase tracking-wider text-gray-400">Estructura Código Bazilio</h3>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs text-gray-400 mb-1">Formato</label>
+                            <select id="codeStructure" onchange="updateBazilioCode()" class="bg-gray-950 border border-gray-700 text-gray-200 rounded-xl px-3 py-2 text-xs w-full focus:outline-none focus:border-emerald-500">
+                                <option value="direct">Secuencial Directo (:)</option>
+                                <option value="loop">Bucle While con Lista</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs text-gray-400 mb-1">Procedimiento</label>
+                            <input type="text" id="procName" value="Main" oninput="updateBazilioCode()" class="bg-gray-950 border border-gray-700 text-gray-200 rounded-xl px-3 py-2 text-xs w-full focus:outline-none focus:border-emerald-500 font-mono">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Columna Derecha: Partitura PDF, Secuencia y Código (7 Cols) -->
+        <div class="lg:col-span-7 space-y-6 flex flex-col">
+
+            <!-- Visualización de la Partitura Imprimible para el PDF -->
+            <div class="bg-gray-900/80 border border-gray-800 rounded-2xl p-5 shadow-xl space-y-4">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center space-x-2">
+                        <i data-lucide="music-4" class="w-5 h-5 text-emerald-400"></i>
+                        <h2 class="text-sm font-semibold uppercase tracking-wider text-gray-300">Pentagramas con Saltos de Sistema (Vistas PDF)</h2>
+                    </div>
+                    <span id="scoreNoteCount" class="text-xs bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2.5 py-0.5 rounded-full font-mono">
+                        0 notas
+                    </span>
+                </div>
+
+                <!-- Hoja de Salida para el PDF (Fondo blanco, formato A4 listo) -->
+                <div class="bg-white p-4 sm:p-6 rounded-xl border border-gray-300 shadow-inner overflow-x-auto min-h-[220px]">
+                    <div id="pdf-score-container" class="pdf-page-wrapper p-4 bg-white text-black space-y-4">
+                        <!-- El pentagrama multilínea se genera dinámicamente aquí -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Secuencia de Notas / Índice -->
+            <div class="bg-gray-900/80 border border-gray-800 rounded-2xl p-5 shadow-xl space-y-3">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center space-x-2">
+                        <i data-lucide="list-music" class="w-5 h-5 text-emerald-400"></i>
+                        <h2 class="text-sm font-semibold uppercase tracking-wider text-gray-300">Secuencia de Notas Agregadas</h2>
+                    </div>
+                    <button onclick="clearAllNotes()" class="text-xs text-rose-400 hover:text-rose-300 flex items-center gap-1 transition-colors">
+                        <i data-lucide="trash-2" class="w-3.5 h-3.5"></i> Vaciar Secuencia
+                    </button>
+                </div>
+
+                <div id="notesSequenceList" class="flex flex-wrap gap-2 p-3 bg-gray-950 border border-gray-800 rounded-xl min-h-[60px] items-center">
+                    <span id="emptySequenceMessage" class="text-xs text-gray-500 italic w-full text-center">No has agregado ninguna nota aún.</span>
+                </div>
+            </div>
+
+            <!-- Código fuente .bzl -->
+            <div class="bg-gray-900/80 border border-gray-800 rounded-2xl p-5 shadow-xl flex-1 flex flex-col space-y-3">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center space-x-2">
+                        <i data-lucide="code" class="w-5 h-5 text-emerald-400"></i>
+                        <h2 class="text-sm font-semibold uppercase tracking-wider text-gray-300">Código Fuente Bazilio (.bzl)</h2>
+                    </div>
+                    <button onclick="copyBazilioCode()" class="text-xs bg-gray-800 hover:bg-gray-700 text-gray-300 px-3 py-1.5 rounded-lg border border-gray-700 flex items-center gap-1 transition-all active:scale-95">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i> Copiar Código
+                    </button>
+                </div>
+
+                <textarea id="bazilioCodeOutput" readonly class="w-full h-36 bg-gray-950 border border-gray-800 rounded-xl p-4 font-mono text-xs text-emerald-400 leading-relaxed resize-none focus:outline-none" spellcheck="false"></textarea>
+            </div>
+
+        </div>
+
+    </main>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="fixed bottom-5 right-5 bg-emerald-600 text-white px-4 py-3 rounded-xl shadow-2xl flex items-center gap-2 text-sm font-medium transform translate-y-20 opacity-0 transition-all duration-300 z-50">
+        <i data-lucide="info" class="w-4 h-4"></i>
+        <span id="toastText">Notificación</span>
+    </div>
+
+    <!-- Script de Aplicación -->
+    <script>
+        let currentOctave = 4;
+        let noteSequence = [];
+        let audioCtx = null;
+        let isPlaying = false;
+        let activePlaybackTimeout = null;
+
+        const baseNotes = ['C', 'D', 'E', 'F', 'G', 'A', 'B'];
+
+        const noteFrequenciesOctave4 = {
+            'C': 261.63, 'D': 293.66, 'E': 329.63, 'F': 349.23,
+            'G': 392.00, 'A': 440.00, 'B': 493.88
+        };
+
+        // --- MANEJO AUDIO WEB SYNTH ---
+        function initAudioContext() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        }
+
+        function calculateFrequency(noteStr) {
+            const clean = noteStr.trim().toUpperCase();
+            const noteLetter = clean.charAt(0);
+            let octave = 4;
+
+            if (clean.length > 1) {
+                octave = parseInt(clean.substring(1));
+                if (isNaN(octave)) octave = 4;
+            }
+
+            const baseFreq = noteFrequenciesOctave4[noteLetter] || 261.63;
+            return baseFreq * Math.pow(2, octave - 4);
+        }
+
+        function playSingleTone(freq, duration = 0.35) {
+            try {
+                initAudioContext();
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+
+                gain.gain.setValueAtTime(0, audioCtx.currentTime);
+                gain.gain.linearRampToValueAtTime(0.25, audioCtx.currentTime + 0.04);
+                gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+
+                osc.start();
+                osc.stop(audioCtx.currentTime + duration);
+            } catch (e) {
+                console.error("Audio error:", e);
+            }
+        }
+
+        function playSequence() {
+            if (noteSequence.length === 0) {
+                showToast("Agrega notas antes de reproducir");
+                return;
+            }
+
+            stopPlayback();
+            isPlaying = true;
+            let index = 0;
+
+            function step() {
+                if (!isPlaying || index >= noteSequence.length) {
+                    isPlaying = false;
+                    return;
+                }
+
+                const note = noteSequence[index];
+                const freq = calculateFrequency(note);
+                playSingleTone(freq, 0.4);
+                
+                index++;
+                activePlaybackTimeout = setTimeout(step, 450);
+            }
+
+            step();
+        }
+
+        function stopPlayback() {
+            isPlaying = false;
+            if (activePlaybackTimeout) {
+                clearTimeout(activePlaybackTimeout);
+                activePlaybackTimeout = null;
+            }
+        }
+
+        // --- OCTAVAS Y NOTAS ---
+        function setOctave(oct) {
+            currentOctave = oct;
+            document.getElementById('octaveDisplay').innerText = oct;
+
+            for (let i = 0; i <= 8; i++) {
+                const btn = document.getElementById(`oct${i}`);
+                if (btn) {
+                    if (i === oct) {
+                        btn.className = 'oct-btn py-1.5 rounded-lg bg-emerald-600 text-white font-bold transition-all shadow';
+                    } else {
+                        btn.className = 'oct-btn py-1.5 rounded-lg hover:bg-gray-800 text-gray-400 transition-all';
+                    }
+                }
+            }
+            renderNoteButtons();
+        }
+
+        function renderNoteButtons() {
+            const grid = document.getElementById('noteButtonsGrid');
+            grid.innerHTML = '';
+
+            baseNotes.forEach(note => {
+                const fullNote = `${note}${currentOctave}`;
+                const btn = document.createElement('button');
+                btn.className = 'flex flex-col items-center justify-center p-3 bg-gray-800 hover:bg-emerald-600/30 border border-gray-700 hover:border-emerald-500 rounded-xl transition-all active:scale-95 group';
+                btn.onclick = () => addNote(fullNote);
+
+                btn.innerHTML = `
+                    <span class="text-base font-bold text-gray-100 group-hover:text-emerald-400 font-mono">${note}</span>
+                    <span class="text-[10px] text-gray-500 group-hover:text-emerald-300">Oct ${currentOctave}</span>
+                `;
+                grid.appendChild(btn);
+            });
+        }
+
+        function addNote(noteStr) {
+            const clean = noteStr.trim().toUpperCase();
+            if (!clean) return;
+
+            noteSequence.push(clean);
+            playSingleTone(calculateFrequency(clean), 0.3);
+            updateAll();
+        }
+
+        function addManualNote() {
+            const input = document.getElementById('manualNoteInput');
+            const val = input.value.trim().toUpperCase();
+            if (val) {
+                addNote(val);
+                input.value = '';
+            }
+        }
+
+        function removeNoteAt(index) {
+            noteSequence.splice(index, 1);
+            updateAll();
+        }
+
+        function clearAllNotes() {
+            noteSequence = [];
+            stopPlayback();
+            updateAll();
+            showToast("Secuencia de notas limpiada");
+        }
+
+        // --- RENDERIZADO DE PENTAGRAMAS MULTILÍNEA / SALTO DE SISTEMA ---
+        function renderVexFlowScore() {
+            const container = document.getElementById('pdf-score-container');
+            container.innerHTML = '';
+
+            if (noteSequence.length === 0) {
+                container.innerHTML = '<div class="text-center py-8 text-gray-400 italic text-sm">Agrega notas a la secuencia para generar el pentagrama.</div>';
+                return;
+            }
+
+            const { Renderer, Stave, StaveNote, Voice, Formatter, StaveTempo } = Vex.Flow;
+
+            // Dividir las notas en bloques (máximo 14 notas por renglón/sistema)
+            const NOTES_PER_LINE = 14;
+            const chunks = [];
+            for (let i = 0; i < noteSequence.length; i += NOTES_PER_LINE) {
+                chunks.push(noteSequence.slice(i, i + NOTES_PER_LINE));
+            }
+
+            const systemWidth = 680; // Ancho apto para A4 Portrait
+
+            chunks.forEach((chunkNotes, chunkIndex) => {
+                // Contenedor para cada renglón/sistema
+                const lineDiv = document.createElement('div');
+                lineDiv.className = 'vexflow-line mb-2';
+                container.appendChild(lineDiv);
+
+                const renderer = new Renderer(lineDiv, Renderer.Backends.SVG);
+                renderer.resize(systemWidth, 120);
+                const context = renderer.getContext();
+
+                const stave = new Stave(10, 10, systemWidth - 20);
+
+                // Únicamente el primer sistema lleva clave, armadura y tempo "♩ = 120" exactamente como en LilyPond
+                if (chunkIndex === 0) {
+                    stave.addClef('treble').addTimeSignature('C');
+                    stave.setTempo({ duration: 'q', bpm: 120 }, 0);
+                } else {
+                    stave.addClef('treble');
+                }
+
+                stave.setContext(context).draw();
+
+                // Convertir notas
+                const vexNotes = chunkNotes.map(noteStr => {
+                    const noteLetter = noteStr.charAt(0).toLowerCase();
+                    let oct = noteStr.length > 1 ? noteStr.substring(1) : '4';
+                    return new StaveNote({
+                        keys: [`${noteLetter}/${oct}`],
+                        duration: 'q'
+                    });
+                });
+
+                try {
+                    const voice = new Voice({ num_beats: chunkNotes.length, beat_value: 4 });
+                    voice.addTickables(vexNotes);
+
+                    new Formatter().joinVoices([voice]).format([voice], systemWidth - (chunkIndex === 0 ? 120 : 80));
+                    voice.draw(context, stave);
+                } catch (e) {
+                    console.warn("Error al renderizar renglón en VexFlow:", e);
+                }
+            });
+        }
+
+        // --- ACTUALIZAR VISTAS Y CÓDIGO BAZILIO ---
+        function updateAll() {
+            document.getElementById('scoreNoteCount').innerText = `${noteSequence.length} ${noteSequence.length === 1 ? 'nota' : 'notas'}`;
+
+            // Actualizar lista interactiva
+            const sequenceContainer = document.getElementById('notesSequenceList');
+            if (noteSequence.length === 0) {
+                sequenceContainer.innerHTML = '<span id="emptySequenceMessage" class="text-xs text-gray-500 italic w-full text-center">No has agregado ninguna nota aún.</span>';
+            } else {
+                sequenceContainer.innerHTML = noteSequence.map((note, idx) => `
+                    <div class="flex items-center gap-1.5 bg-emerald-950/70 border border-emerald-500/40 text-emerald-300 px-3 py-1.5 rounded-xl font-mono text-xs shadow-sm">
+                        <span>${note}</span>
+                        <button onclick="removeNoteAt(${idx})" class="text-emerald-500/60 hover:text-rose-400 transition-colors ml-1">
+                            <i data-lucide="x" class="w-3.5 h-3.5"></i>
+                        </button>
+                    </div>
+                `).join('');
+                lucide.createIcons();
+            }
+
+            renderVexFlowScore();
+            updateBazilioCode();
+        }
+
+        function updateBazilioCode() {
+            const proc = document.getElementById('procName').value.trim() || 'Main';
+            const structure = document.getElementById('codeStructure').value;
+            const textarea = document.getElementById('bazilioCodeOutput');
+
+            let code = `### Partitura Creada en Bazilio Studio ###\n\n`;
+
+            if (structure === 'direct') {
+                code += `${proc} |:\n`;
+                if (noteSequence.length === 0) {
+                    code += `    <w> "Partitura vacia"\n`;
+                } else {
+                    code += `    <w> "Ejecutando partitura..."\n\n`;
+                    noteSequence.forEach(n => {
+                        code += `    (:) ${n}\n`;
+                    });
+                }
+                code += `:|\n`;
+            } else if (structure === 'loop') {
+                code += `${proc} |:\n`;
+                if (noteSequence.length === 0) {
+                    code += `    <w> "Partitura vacia"\n`;
+                } else {
+                    code += `    <w> "Reproduciendo lista de notas..."\n\n`;
+                    code += `    miPartitura <- {${noteSequence.join(' ')}}\n`;
+                    code += `    i <- 1\n`;
+                    code += `    total <- #miPartitura\n\n`;
+                    code += `    while i <= total |:\n`;
+                    code += `        (:) miPartitura[i]\n`;
+                    code += `        i <- i + 1\n`;
+                    code += `    :|\n`;
+                }
+                code += `:|\n`;
+            }
+
+            textarea.value = code;
+        }
+
+        // --- EXPORTACIÓN DE ARCHIVOS ---
+        function exportToPDF() {
+            if (noteSequence.length === 0) {
+                showToast("Agrega notas antes de descargar el PDF");
+                return;
+            }
+
+            const element = document.getElementById('pdf-score-container');
+            
+            // Opciones optimizadas para exportar la partitura multi-renglón en hoja A4 Vertical
+            const opt = {
+                margin:       [15, 15, 15, 15],
+                filename:     'partitura_bazilio.pdf',
+                image:        { type: 'jpeg', quality: 0.98 },
+                html2canvas:  { scale: 2, useCORS: true, logging: false },
+                jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+            };
+
+            showToast("Generando archivo PDF...");
+            html2pdf().set(opt).from(element).save().then(() => {
+                showToast("PDF descargado correctamente");
+            });
+        }
+
+        function exportBZL() {
+            const code = document.getElementById('bazilioCodeOutput').value;
+            const blob = new Blob([code], { type: 'text/plain;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'partitura.bzl';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            showToast("Archivo partitura.bzl descargado");
+        }
+
+        function copyBazilioCode() {
+            const code = document.getElementById('bazilioCodeOutput').value;
+            const textarea = document.createElement('textarea');
+            textarea.value = code;
+            document.body.appendChild(textarea);
+            textarea.select();
+            document.execCommand('copy');
+            document.body.removeChild(textarea);
+            showToast("Código .bzl copiado al portapapeles");
+        }
+
+        function showToast(msg) {
+            const toast = document.getElementById('toast');
+            document.getElementById('toastText').innerText = msg;
+            toast.classList.remove('translate-y-20', 'opacity-0');
+            setTimeout(() => {
+                toast.classList.add('translate-y-20', 'opacity-0');
+            }, 3000);
+        }
+
+        // --- INICIALIZACIÓN ---
+        window.onload = () => {
+            lucide.createIcons();
+            setOctave(4);
+            updateAll();
+
+            document.getElementById('manualNoteInput').addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') addManualNote();
+            });
+        };
+    </script>
+</body>
+</html>
