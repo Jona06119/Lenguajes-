@@ -3,7 +3,7 @@ from flask import Flask, render_template_string, request, send_from_directory
 
 app = Flask(__name__)
 
-# Directorio donde se guardarán los archivos temporales (audios, PDFs)
+# Directorio para los archivos generados
 STATIC_DIR = os.path.join(os.path.dirname(__file__), 'static')
 os.makedirs(STATIC_DIR, exist_ok=True)
 
@@ -12,50 +12,108 @@ INDEX_HTML = """
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Bazilio - Intérprete DSL</title>
+    <title>ANTLR y LilyPond</title>
     <style>
-        body { font-family: Arial, sans-serif; margin: 40px; background: #f4f4f9; color: #333; }
-        .container { max-width: 800px; margin: auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-        textarea { width: 100%; height: 150px; font-family: monospace; padding: 10px; border: 1px solid #ccc; border-radius: 4px; }
-        input[type="submit"] { background: #007bff; color: white; border: none; padding: 10px 20px; cursor: pointer; border-radius: 4px; margin-top: 10px; }
-        input[type="submit"]:hover { background: #0056b3; }
-        pre { background: #eee; padding: 10px; border-radius: 4px; }
-        .results { margin-top: 20px; }
-        .file-links a { display: inline-block; margin-right: 15px; padding: 8px 12px; background: #28a745; color: white; text-decoration: none; border-radius: 4px; }
-        .file-links a:hover { background: #218838; }
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
+            background: #121212; 
+            color: #ffffff; 
+            display: flex; 
+            justify-content: center; 
+            align-items: center; 
+            min-height: 100vh; 
+            margin: 0; 
+        }
+        .container { 
+            width: 100%; 
+            max-width: 480px; 
+            background: #1e1e1e; 
+            padding: 30px; 
+            border-radius: 12px; 
+            box-shadow: 0 8px 24px rgba(0,0,0,0.5); 
+        }
+        h1 { font-size: 24px; margin-bottom: 25px; font-weight: 700; }
+        label { display: block; font-size: 14px; margin-bottom: 8px; color: #ccc; }
+        input[type="text"], textarea { 
+            width: 100%; 
+            background: #2a2a2a; 
+            border: 1px solid #3a3a3a; 
+            border-radius: 8px; 
+            color: white; 
+            padding: 12px; 
+            font-size: 14px; 
+            box-sizing: border-box; 
+            margin-bottom: 20px; 
+        }
+        textarea { height: 120px; font-family: monospace; resize: vertical; }
+        input[type="text"]:focus, textarea:focus { border-color: #007bff; outline: none; }
+        .btn { 
+            background: #222; 
+            color: white; 
+            border: 1px solid #444; 
+            padding: 12px 20px; 
+            cursor: pointer; 
+            border-radius: 8px; 
+            font-size: 14px; 
+            width: 100%; 
+            font-weight: 600;
+            transition: background 0.2s;
+        }
+        .btn:hover { background: #333; }
+        .success-box { 
+            background: #1b3b2b; 
+            border: 1px solid #2d6a4f; 
+            color: #52b788; 
+            padding: 12px; 
+            border-radius: 8px; 
+            margin-top: 20px; 
+            font-size: 14px; 
+        }
+        audio { width: 100%; margin-top: 20px; border-radius: 8px; }
+        .download-btn { 
+            display: block; 
+            text-align: center; 
+            background: transparent; 
+            color: white; 
+            border: 1px solid #444; 
+            padding: 12px; 
+            border-radius: 8px; 
+            text-decoration: none; 
+            margin-top: 15px; 
+            font-size: 14px; 
+            font-weight: 600;
+        }
+        .download-btn:hover { background: #2a2a2a; }
     </style>
 </head>
 <body>
     <div class="container">
-        <h2>Intérprete de Bazilio</h2>
+        <h1>ANTLR y LilyPond</h1>
         <form method="POST">
-            <label>Código fuente:</label><br>
-            <textarea name="codigo">{{ codigo or '' }}</textarea><br>
-            <input type="submit" value="Ejecutar Código">
+            <label>Nombre de la cancion:</label>
+            <input type="text" name="nombre_cancion" value="{{ nombre_cancion or 'mi_melodia' }}" required>
+            
+            <label>Escribe tus notas (ej: c4, d4, e4, do#):</label>
+            <textarea name="codigo" placeholder="g4&#10;g4&#10;f4&#10;f4">{{ codigo or '' }}</textarea>
+            
+            <button type="submit" class="btn">Convertir y Generar</button>
         </form>
-        
-        {% if resultado %}
-            <div class="results">
-                <h3>Resultado de la ejecución:</h3>
-                <pre>{{ resultado }}</pre>
+
+        {% if mensaje_exito %}
+            <div class="success-box">
+                {{ mensaje_exito }}
             </div>
         {% endif %}
 
-        {% if audio_file or pdf_file %}
-            <div class="file-links">
-                <h3>Archivos Generados:</h3>
-                {% if audio_file %}
-                    <audio controls style="width: 100%; margin-bottom: 10px;">
-                        <source src="{{ url_for('static', filename=audio_file) }}" type="audio/wav">
-                        Tu navegador no soporta el elemento de audio.
-                    </audio>
-                    <br>
-                    <a href="{{ url_for('static', filename=audio_file) }}" download>Descargar Audio (.wav)</a>
-                {% endif %}
-                {% if pdf_file %}
-                    <a href="{{ url_for('static', filename=pdf_file) }}" target="_blank">Ver / Descargar PDF</a>
-                {% endif %}
-            </div>
+        {% if audio_file %}
+            <audio controls>
+                <source src="{{ url_for('static', filename=audio_file) }}" type="audio/wav">
+                Tu navegador no soporta el elemento de audio.
+            </audio>
+        {% endif %}
+
+        {% if pdf_file %}
+            <a href="{{ url_for('static', filename=pdf_file) }}" class="download-btn" target="_blank">Descargar Partitura PDF</a>
         {% endif %}
     </div>
 </body>
@@ -64,50 +122,30 @@ INDEX_HTML = """
 
 @app.route("/", methods=["GET", "POST"])
 def index():
-    resultado = None
+    nombre_cancion = "mi_melodia"
     codigo = None
+    mensaje_exito = None
     audio_file = None
     pdf_file = None
 
     if request.method == "POST":
+        nombre_cancion = request.form.get("nombre_cancion", "mi_melodia")
         codigo = request.form.get("codigo")
         
-        # 1. Guardar el código temporalmente para que tu parser lo lea (o pasarlo en memoria)
-        temp_input_path = os.path.join(STATIC_DIR, "temp_codigo.txt")
-        with open(temp_input_path, "w", encoding="utf-8") as f:
-            f.write(codigo)
-
-        try:
-            # ==========================================
-            # 2. AQUÍ LLAMAS A TU INTÉRPRETE DE ANTLR
-            # ==========================================
-            # Ejemplo (ajusta esto según cómo ejecutes tu script de ANTLR por lo general):
-            # import subprocess
-            # proceso = subprocess.run(['python', 'bazilio_etapa5.py', temp_input_path], capture_output=True, text=True)
-            # resultado = proceso.stdout if proceso.returncode == 0 else proceso.stderr
-            
-            # O si importas directamente tus funciones:
-            # from bazilio_etapa5 import ejecutar_interprete
-            # resultado = ejecutar_interprete(codigo)
-
-            # Por ahora, simulamos la ejecución y la detección de archivos si tu código los crea:
-            resultado = f"Código procesado con éxito:\n{codigo}"
-            
-            # Si tu intérprete genera archivos específicos en static/, búscalos:
-            if os.path.exists(os.path.join(STATIC_DIR, "hanoi_musical.wav")) or os.path.exists(os.path.join(STATIC_DIR, "hello.wav")):
-                audio_file = "hanoi_musical.wav" if os.path.exists(os.path.join(STATIC_DIR, "hanoi_musical.wav")) else "hello.wav"
-                
-            if os.path.exists(os.path.join(STATIC_DIR, "hello.pdf")):
-                pdf_file = "hello.pdf"
-
-        except Exception as e:
-            resultado = f"Error al ejecutar el intérprete: {str(e)}"
+        # Aquí puedes llamar a tu intérprete/generador con el código y nombre recibidos.
+        # Por ahora simulamos la generación exitosa y asignamos los archivos si existen en static/
+        mensaje_exito = f"Archivos generados correctamente para '{nombre_cancion}'"
+        
+        # Ejemplo de nombres esperados generados por tu lógica:
+        audio_file = "hanoi_musical.wav" if os.path.exists(os.path.join(STATIC_DIR, "hanoi_musical.wav")) else None
+        pdf_file = "hello.pdf" if os.path.exists(os.path.join(STATIC_DIR, "hello.pdf")) else None
 
     return render_template_string(
-        INDEX_HTML, 
-        resultado=resultado, 
-        codigo=codigo, 
-        audio_file=audio_file, 
+        INDEX_HTML,
+        nombre_cancion=nombre_cancion,
+        codigo=codigo,
+        mensaje_exito=mensaje_exito,
+        audio_file=audio_file,
         pdf_file=pdf_file
     )
 
