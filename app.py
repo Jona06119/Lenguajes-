@@ -1,5 +1,10 @@
 import os
+import sys
 from flask import Flask, render_template_string, request, url_for
+from antlr4 import InputStream, CommonTokenStream
+
+# Importamos tu intérprete desde bazilio.py
+from bazilio import BazilioLexer, BazilioParser, BazilioInterpreter, generar_archivos
 
 app = Flask(__name__)
 
@@ -85,6 +90,16 @@ INDEX_HTML = """
             font-weight: 600;
         }
         .download-btn:hover { background: #2a2a2a; }
+        .error-box {
+            background: #3b1b1b;
+            border: 1px solid #6a2d2d;
+            color: #ff8888;
+            padding: 12px;
+            border-radius: 8px;
+            margin-top: 20px;
+            font-size: 14px;
+            white-space: pre-wrap;
+        }
     </style>
 </head>
 <body>
@@ -95,7 +110,7 @@ INDEX_HTML = """
             <input type="text" name="nombre_cancion" value="{{ nombre_cancion or 'mi_melodia' }}" required>
             
             <label>Escribe tus notas (ej: c4, d4, e4, do#):</label>
-            <textarea name="codigo" placeholder="g4&#10;g4&#10;f4&#10;f4" required>{{ codigo or '' }}</textarea>
+            <textarea name="codigo" placeholder="PROC Main &#10;INICIO&#10;  TOCA c4&#10;  TOCA d4&#10;FIN" required>{{ codigo or '' }}</textarea>
             
             <button type="submit" class="btn">Convertir y Generar</button>
         </form>
@@ -106,8 +121,13 @@ INDEX_HTML = """
             </div>
         {% endif %}
 
+        {% if error %}
+            <div class="error-box">
+                {{ error }}
+            </div>
+        {% endif %}
+
         {% if audio_file %}
-            <!-- Reproductor integrado para escuchar ahí mismo -->
             <audio controls autoplay>
                 <source src="{{ url_for('static', filename=audio_file) }}?t={{ timestamp }}" type="audio/wav">
                 Tu navegador no soporta el elemento de audio.
@@ -115,7 +135,6 @@ INDEX_HTML = """
         {% endif %}
 
         {% if pdf_file %}
-            <!-- Botón para abrir o descargar el PDF generado al momento -->
             <a href="{{ url_for('static', filename=pdf_file) }}?t={{ timestamp }}" class="download-btn" target="_blank">Descargar Partitura PDF</a>
         {% endif %}
     </div>
@@ -128,49 +147,53 @@ def index():
     nombre_cancion = "mi_melodia"
     codigo = ""
     mensaje_exito = None
+    error = None
     audio_file = None
     pdf_file = None
     import time
     timestamp = int(time.time())
 
     if request.method == "POST":
-        nombre_cancion = request.form.get("nombre_cancion", "mi_melodia")
+        nombre_cancion = request.form.get("nombre_cancion", "mi_melodia").strip()
         codigo = request.form.get("codigo")
         
-        # =========================================================================
-        # AQUÍ INTEGRAS LA LLAMADA A TU INTÉRPRETE ANTLR / LILYPOND:
-        # 1. Guardas el texto ingresado en un archivo temporal o se lo pasas a tu parser.
-        # 2. Ejecutas la lógica que genera tu archivo .wav y tu archivo .pdf.
-        # 3. Asegúrate de guardar esos archivos resultantes directamente en 'static/'
-        #    con nombres fijos o basados en la canción (ej: static/audio.wav y static/partitura.pdf).
-        # =========================================================================
+        # Rutas de salida directas en la carpeta static/
+        base_path = os.path.join(STATIC_DIR, nombre_cancion)
+        
+        try:
+            # 1. Procesamos el código con ANTLR utilizando tu analizador de bazilio.py
+            input_stream = InputStream(codigo)
+            lexer = BazilioLexer(input_stream)
+            stream = CommonTokenStream(lexer)
+            parser = BazilioParser(stream)
+            tree = parser.program()
+            
+            interpreter = BazilioInterpreter()
+            interpreter.visit(tree)
+            
+            if interpreter.notas_tocadas:
+                # 2. Generamos los archivos físicos (PDF y WAV) usando tu función existente
+                generar_archivos(base_path, interpreter.notas_tocadas)
+                
+                # Verificamos que se hayan creado en la carpeta static
+                if os.path.exists(f"{base_path}.wav"):
+                    audio_file = f"{nombre_cancion}.wav"
+                if os.path.exists(f"{base_path}.pdf"):
+                    pdf_file = f"{nombre_cancion}.pdf"
+                
+                mensaje_exito = f"Archivos generados correctamente para '{nombre_cancion}'"
+            else:
+                error = "El código se ejecutó, pero no se detectaron notas musicales con la instrucción TOCA."
 
-        # Ejemplo de simulación de nombres de archivos generados en la carpeta static:
-        audio_nombre = "hanoi_musical.wav"  # O el nombre que genere tu app
-        pdf_nombre = "hello.pdf"            # O el nombre que genere tu app
-
-        # Verificamos que realmente se hayan creado en la carpeta static
-        audio_path = os.path.join(STATIC_DIR, audio_nombre)
-        pdf_path = os.path.join(STATIC_DIR, pdf_nombre)
-
-        # (Opcional para pruebas: si no existen físicamente aún, puedes crear archivos vacíos o de prueba)
-        if not os.path.exists(audio_path):
-            with open(audio_path, "wb") as f:
-                f.write(b"") # Reemplaza esto con la ejecución real de tu intérprete
-        if not os.path.exists(pdf_path):
-            with open(pdf_path, "wb") as f:
-                f.write(b"") # Reemplaza esto con la generación real de tu PDF
-
-        # Activamos las variables para que aparezcan en la vista web
-        mensaje_exito = f"Archivos generados correctamente para '{nombre_cancion}'"
-        audio_file = audio_nombre
-        pdf_file = pdf_nombre
+        except Exception as e:
+            error = f"Error al interpretar o compilar:\n{str(e)}"
 
     return render_template_string(
         INDEX_HTML,
         nombre_cancion=nombre_cancion,
         codigo=codigo,
         mensaje_exito=mensaje_exito,
+        error=error,
         audio_file=audio_file,
         pdf_file=pdf_file,
         timestamp=timestamp
