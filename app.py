@@ -4,7 +4,7 @@ from flask import Flask, render_template_string, request, url_for
 from antlr4 import InputStream, CommonTokenStream
 
 # Importamos tu intérprete desde bazilio.py
-from bazilio import BazilioLexer, BazilioParser, BazilioInterpreter, generar_archivos
+from bazilio import bazilioLexer, bazilioParser, bazilioInterpreter, generar_archivos
 
 app = Flask(__name__)
 
@@ -163,12 +163,12 @@ def index():
         try:
             # 1. Procesamos el código con ANTLR utilizando tu analizador de bazilio.py
             input_stream = InputStream(codigo)
-            lexer = BazilioLexer(input_stream)
+            lexer = bazilioLexer(input_stream)
             stream = CommonTokenStream(lexer)
-            parser = BazilioParser(stream)
+            parser = bazilioParser(stream)
             tree = parser.program()
             
-            interpreter = BazilioInterpreter()
+            interpreter = bazilioInterpreter()
             interpreter.visit(tree)
             
             if interpreter.notas_tocadas:
