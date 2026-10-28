@@ -3,7 +3,7 @@ import sys
 from flask import Flask, render_template_string, request, url_for
 from antlr4 import InputStream, CommonTokenStream
 
-# Importación correcta respetando las mayúsculas de Bazilio
+# Importamos tu intérprete desde bazilio.py
 from bazilio import bazilioLexer, bazilioParser, bazilioInterpreter, generar_archivos
 
 app = Flask(__name__)
@@ -75,7 +75,7 @@ INDEX_HTML = """
             font-size: 14px; 
             text-align: center;
         }
-        /* Estilo horizontal para el reproductor y el PDF */
+        /* Estructura horizontal para audio y PDF */
         .results-row {
             display: flex;
             align-items: center;
@@ -175,7 +175,7 @@ def index():
         nombre_cancion = request.form.get("nombre_cancion", "mi_melodia").strip()
         codigo = request.form.get("codigo", "").strip()
         
-        # --- ENVUELVE EL CÓDIGO SIN LA PALABRA 'PROC' ---
+        # --- ENVUELVE AUTOMÁTICAMENTE LAS NOTAS CON { Y } ---
         if codigo:
             if not codigo.upper().startswith("MAIN"):
                 import re
@@ -186,13 +186,13 @@ def index():
                 for nota in notas_ingresadas:
                     instrucciones.append(f"    TOCA {nota}")
                 
-                codigo = "Main\nINICIO\n" + "\n".join(instrucciones) + "\nFIN"
-        # ------------------------------------------------
-        # Rutas de salida directas en la carpeta static/
+                # Usamos llaves { y } en lugar de INICIO y FIN
+                codigo = "Main\n{\n" + "\n".join(instrucciones) + "\n}"
+        # ----------------------------------------------------
+
         base_path = os.path.join(STATIC_DIR, nombre_cancion)
         
         try:
-            # Procesamos el código con ANTLR utilizando tu analizador
             input_stream = InputStream(codigo)
             lexer = bazilioLexer(input_stream)
             stream = CommonTokenStream(lexer)
@@ -203,10 +203,8 @@ def index():
             interpreter.visit(tree)
             
             if interpreter.notas_tocadas:
-                # Generamos los archivos físicos (PDF y WAV)
                 generar_archivos(base_path, interpreter.notas_tocadas)
                 
-                # Verificamos que se hayan creado en la carpeta static
                 if os.path.exists(f"{base_path}.wav"):
                     audio_file = f"{nombre_cancion}.wav"
                 if os.path.exists(f"{base_path}.pdf"):
