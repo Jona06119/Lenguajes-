@@ -1,9 +1,9 @@
 import os
-from flask import Flask, render_template_string, request, send_from_directory
+from flask import Flask, render_template_string, request, url_for
 
 app = Flask(__name__)
 
-# Directorio para los archivos generados
+# Directorio de archivos estáticos
 STATIC_DIR = os.path.join(os.path.dirname(__file__), 'static')
 os.makedirs(STATIC_DIR, exist_ok=True)
 
@@ -32,7 +32,7 @@ INDEX_HTML = """
             border-radius: 12px; 
             box-shadow: 0 8px 24px rgba(0,0,0,0.5); 
         }
-        h1 { font-size: 24px; margin-bottom: 25px; font-weight: 700; }
+        h1 { font-size: 24px; margin-bottom: 25px; font-weight: 700; text-align: center; }
         label { display: block; font-size: 14px; margin-bottom: 8px; color: #ccc; }
         input[type="text"], textarea { 
             width: 100%; 
@@ -68,6 +68,7 @@ INDEX_HTML = """
             border-radius: 8px; 
             margin-top: 20px; 
             font-size: 14px; 
+            text-align: center;
         }
         audio { width: 100%; margin-top: 20px; border-radius: 8px; }
         .download-btn { 
@@ -94,7 +95,7 @@ INDEX_HTML = """
             <input type="text" name="nombre_cancion" value="{{ nombre_cancion or 'mi_melodia' }}" required>
             
             <label>Escribe tus notas (ej: c4, d4, e4, do#):</label>
-            <textarea name="codigo" placeholder="g4&#10;g4&#10;f4&#10;f4">{{ codigo or '' }}</textarea>
+            <textarea name="codigo" placeholder="g4&#10;g4&#10;f4&#10;f4" required>{{ codigo or '' }}</textarea>
             
             <button type="submit" class="btn">Convertir y Generar</button>
         </form>
@@ -106,14 +107,16 @@ INDEX_HTML = """
         {% endif %}
 
         {% if audio_file %}
-            <audio controls>
-                <source src="{{ url_for('static', filename=audio_file) }}" type="audio/wav">
+            <!-- Reproductor integrado para escuchar ahí mismo -->
+            <audio controls autoplay>
+                <source src="{{ url_for('static', filename=audio_file) }}?t={{ timestamp }}" type="audio/wav">
                 Tu navegador no soporta el elemento de audio.
             </audio>
         {% endif %}
 
         {% if pdf_file %}
-            <a href="{{ url_for('static', filename=pdf_file) }}" class="download-btn" target="_blank">Descargar Partitura PDF</a>
+            <!-- Botón para abrir o descargar el PDF generado al momento -->
+            <a href="{{ url_for('static', filename=pdf_file) }}?t={{ timestamp }}" class="download-btn" target="_blank">Descargar Partitura PDF</a>
         {% endif %}
     </div>
 </body>
@@ -123,22 +126,45 @@ INDEX_HTML = """
 @app.route("/", methods=["GET", "POST"])
 def index():
     nombre_cancion = "mi_melodia"
-    codigo = None
+    codigo = ""
     mensaje_exito = None
     audio_file = None
     pdf_file = None
+    import time
+    timestamp = int(time.time())
 
     if request.method == "POST":
         nombre_cancion = request.form.get("nombre_cancion", "mi_melodia")
         codigo = request.form.get("codigo")
         
-        # Aquí puedes llamar a tu intérprete/generador con el código y nombre recibidos.
-        # Por ahora simulamos la generación exitosa y asignamos los archivos si existen en static/
+        # =========================================================================
+        # AQUÍ INTEGRAS LA LLAMADA A TU INTÉRPRETE ANTLR / LILYPOND:
+        # 1. Guardas el texto ingresado en un archivo temporal o se lo pasas a tu parser.
+        # 2. Ejecutas la lógica que genera tu archivo .wav y tu archivo .pdf.
+        # 3. Asegúrate de guardar esos archivos resultantes directamente en 'static/'
+        #    con nombres fijos o basados en la canción (ej: static/audio.wav y static/partitura.pdf).
+        # =========================================================================
+
+        # Ejemplo de simulación de nombres de archivos generados en la carpeta static:
+        audio_nombre = "hanoi_musical.wav"  # O el nombre que genere tu app
+        pdf_nombre = "hello.pdf"            # O el nombre que genere tu app
+
+        # Verificamos que realmente se hayan creado en la carpeta static
+        audio_path = os.path.join(STATIC_DIR, audio_nombre)
+        pdf_path = os.path.join(STATIC_DIR, pdf_nombre)
+
+        # (Opcional para pruebas: si no existen físicamente aún, puedes crear archivos vacíos o de prueba)
+        if not os.path.exists(audio_path):
+            with open(audio_path, "wb") as f:
+                f.write(b"") # Reemplaza esto con la ejecución real de tu intérprete
+        if not os.path.exists(pdf_path):
+            with open(pdf_path, "wb") as f:
+                f.write(b"") # Reemplaza esto con la generación real de tu PDF
+
+        # Activamos las variables para que aparezcan en la vista web
         mensaje_exito = f"Archivos generados correctamente para '{nombre_cancion}'"
-        
-        # Ejemplo de nombres esperados generados por tu lógica:
-        audio_file = "hanoi_musical.wav" if os.path.exists(os.path.join(STATIC_DIR, "hanoi_musical.wav")) else None
-        pdf_file = "hello.pdf" if os.path.exists(os.path.join(STATIC_DIR, "hello.pdf")) else None
+        audio_file = audio_nombre
+        pdf_file = pdf_nombre
 
     return render_template_string(
         INDEX_HTML,
@@ -146,7 +172,8 @@ def index():
         codigo=codigo,
         mensaje_exito=mensaje_exito,
         audio_file=audio_file,
-        pdf_file=pdf_file
+        pdf_file=pdf_file,
+        timestamp=timestamp
     )
 
 if __name__ == "__main__":
