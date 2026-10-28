@@ -3,8 +3,8 @@ import sys
 from flask import Flask, render_template_string, request, url_for
 from antlr4 import InputStream, CommonTokenStream
 
-# Importamos tu intérprete desde bazilio.py
-from bazilio import bazilioLexer, bazilioParser, bazilioInterpreter, generar_archivos
+# Importación correcta respetando las mayúsculas de Bazilio
+from bazilio import BazilioLexer, BazilioParser, BazilioInterpreter, generar_archivos
 
 app = Flask(__name__)
 
@@ -31,7 +31,7 @@ INDEX_HTML = """
         }
         .container { 
             width: 100%; 
-            max-width: 480px; 
+            max-width: 520px; 
             background: #1e1e1e; 
             padding: 30px; 
             border-radius: 12px; 
@@ -75,21 +75,35 @@ INDEX_HTML = """
             font-size: 14px; 
             text-align: center;
         }
-        audio { width: 100%; margin-top: 20px; border-radius: 8px; }
+        /* Estilo horizontal para el reproductor y el PDF */
+        .results-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-top: 20px;
+        }
+        audio { 
+            flex: 1; 
+            height: 40px;
+            border-radius: 8px; 
+        }
         .download-btn { 
-            display: block; 
-            text-align: center; 
-            background: transparent; 
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #2a2a2a; 
             color: white; 
             border: 1px solid #444; 
-            padding: 12px; 
+            padding: 0 16px; 
+            height: 40px;
             border-radius: 8px; 
             text-decoration: none; 
-            margin-top: 15px; 
             font-size: 14px; 
             font-weight: 600;
+            white-space: nowrap;
+            box-sizing: border-box;
         }
-        .download-btn:hover { background: #2a2a2a; }
+        .download-btn:hover { background: #333; }
         .error-box {
             background: #3b1b1b;
             border: 1px solid #6a2d2d;
@@ -109,8 +123,8 @@ INDEX_HTML = """
             <label>Nombre de la cancion:</label>
             <input type="text" name="nombre_cancion" value="{{ nombre_cancion or 'mi_melodia' }}" required>
             
-            <label>Escribe tus notas (ej: c4, d4, e4, do#):</label>
-            <textarea name="codigo" placeholder="PROC Main &#10;INICIO&#10;  TOCA c4&#10;  TOCA d4&#10;FIN" required>{{ codigo or '' }}</textarea>
+            <label>Escribe tus notas (ej: C4, D4, E4):</label>
+            <textarea name="codigo" placeholder="C4&#10;D4&#10;E4&#10;F4" required>{{ codigo or '' }}</textarea>
             
             <button type="submit" class="btn">Convertir y Generar</button>
         </form>
@@ -127,15 +141,19 @@ INDEX_HTML = """
             </div>
         {% endif %}
 
-        {% if audio_file %}
-            <audio controls autoplay>
-                <source src="{{ url_for('static', filename=audio_file) }}?t={{ timestamp }}" type="audio/wav">
-                Tu navegador no soporta el elemento de audio.
-            </audio>
-        {% endif %}
+        {% if audio_file or pdf_file %}
+            <div class="results-row">
+                {% if audio_file %}
+                    <audio controls autoplay>
+                        <source src="{{ url_for('static', filename=audio_file) }}?t={{ timestamp }}" type="audio/wav">
+                        Tu navegador no soporta el elemento de audio.
+                    </audio>
+                {% endif %}
 
-        {% if pdf_file %}
-            <a href="{{ url_for('static', filename=pdf_file) }}?t={{ timestamp }}" class="download-btn" target="_blank">Descargar Partitura PDF</a>
+                {% if pdf_file %}
+                    <a href="{{ url_for('static', filename=pdf_file) }}?t={{ timestamp }}" class="download-btn" target="_blank">PDF</a>
+                {% endif %}
+            </div>
         {% endif %}
     </div>
 </body>
@@ -155,24 +173,36 @@ def index():
 
     if request.method == "POST":
         nombre_cancion = request.form.get("nombre_cancion", "mi_melodia").strip()
-        codigo = request.form.get("codigo")
+        codigo = request.form.get("codigo", "").strip()
         
+        # --- ENVUELVE AUTOMÁTICAMENTE LAS NOTAS SI EL USUARIO NO PUSO LA ESTRUCTURA ---
+        if codigo and not codigo.upper().startswith("PROC"):
+            lineas = [l.strip() for l in codigo.splitlines() if l.strip()]
+            instrucciones = []
+            for l in lineas:
+                if not l.upper().startswith("TOCA"):
+                    instrucciones.append(f"    TOCA {l}")
+                else:
+                    instrucciones.append(f"    {l}")
+            codigo = "PROC Main\nINICIO\n" + "\n".join(instrucciones) + "\nFIN"
+        # --------------------------------------------------------------------------
+
         # Rutas de salida directas en la carpeta static/
         base_path = os.path.join(STATIC_DIR, nombre_cancion)
         
         try:
-            # 1. Procesamos el código con ANTLR utilizando tu analizador de bazilio.py
+            # Procesamos el código con ANTLR utilizando tu analizador
             input_stream = InputStream(codigo)
-            lexer = bazilioLexer(input_stream)
+            lexer = BazilioLexer(input_stream)
             stream = CommonTokenStream(lexer)
-            parser = bazilioParser(stream)
-            tree = parser.programa()
+            parser = BazilioParser(stream)
+            tree = parser.programa()  # Regla principal en minúscula como en tu gramática g4
             
-            interpreter = bazilioInterpreter()
+            interpreter = BazilioInterpreter()
             interpreter.visit(tree)
             
             if interpreter.notas_tocadas:
-                # 2. Generamos los archivos físicos (PDF y WAV) usando tu función existente
+                # Generamos los archivos físicos (PDF y WAV)
                 generar_archivos(base_path, interpreter.notas_tocadas)
                 
                 # Verificamos que se hayan creado en la carpeta static
