@@ -4,7 +4,7 @@ from flask import Flask, render_template_string, request, url_for
 from antlr4 import InputStream, CommonTokenStream
 
 # Importación correcta respetando las mayúsculas de Bazilio
-from bazilio import BazilioLexer, BazilioParser, BazilioInterpreter, generar_archivos
+from bazilio import bazilioLexer, bazilioParser, bazilioInterpreter, generar_archivos
 
 app = Flask(__name__)
 
@@ -193,12 +193,12 @@ def index():
         try:
             # Procesamos el código con ANTLR utilizando tu analizador
             input_stream = InputStream(codigo)
-            lexer = BazilioLexer(input_stream)
+            lexer = bazilioLexer(input_stream)
             stream = CommonTokenStream(lexer)
-            parser = BazilioParser(stream)
+            parser = bazilioParser(stream)
             tree = parser.programa()  # Regla principal en minúscula como en tu gramática g4
             
-            interpreter = BazilioInterpreter()
+            interpreter = bazilioInterpreter()
             interpreter.visit(tree)
             
             if interpreter.notas_tocadas:
