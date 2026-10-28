@@ -53,9 +53,16 @@ class bazilioInterpreter(bazilioVisitor):
                 val_conv = val
         self.set_var(var_name, val_conv)
 
-    def visitReproduccion(self, ctx):  # <-- Coincide con # Reproduccion en el .g4
+    def visitReproduccion(self, ctx):
         val = self.visit(ctx.expr())
-        self.notas_tocadas.append(val)
+        if val is not None:
+            self.notas_tocadas.append(val)
+
+    def visitNota(self, ctx):
+        text = ctx.NOTA().getText()
+        base = text[0].upper()
+        octava = int(text[1]) if len(text) > 1 else 4
+        return (octava * 7) + self.NOTE_MAP.get(base, 0) - 5
 
     def visitIteracion(self, ctx):   # <-- Coincide con # Iteracion en el .g4
         while self.visit(ctx.expr()):
