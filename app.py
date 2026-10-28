@@ -3,7 +3,7 @@ import sys
 from flask import Flask, render_template_string, request, url_for
 from antlr4 import InputStream, CommonTokenStream
 
-# Importamos tu intérprete desde bazilio.py
+# Importación exacta con minúsculas para que coincida con bazilio.py
 from bazilio import bazilioLexer, bazilioParser, bazilioInterpreter, generar_archivos
 
 app = Flask(__name__)
@@ -75,7 +75,7 @@ INDEX_HTML = """
             font-size: 14px; 
             text-align: center;
         }
-        /* Estructura horizontal para audio y PDF */
+        /* Contenedor horizontal para audio y PDF */
         .results-row {
             display: flex;
             align-items: center;
@@ -124,7 +124,7 @@ INDEX_HTML = """
             <input type="text" name="nombre_cancion" value="{{ nombre_cancion or 'mi_melodia' }}" required>
             
             <label>Escribe tus notas (ej: C4, D4, E4):</label>
-            <textarea name="codigo" placeholder="C4&#10;D4&#10;E4&#10;F4" required>{{ codigo or '' }}</textarea>
+            <textarea name="codigo" placeholder="Main&#10;{&#10;    TOCA C4&#10;    TOCA D4&#10;}" required>{{ codigo or '' }}</textarea>
             
             <button type="submit" class="btn">Convertir y Generar</button>
         </form>
@@ -175,20 +175,17 @@ def index():
         nombre_cancion = request.form.get("nombre_cancion", "mi_melodia").strip()
         codigo = request.form.get("codigo", "").strip()
         
-        # --- ENVUELVE AUTOMÁTICAMENTE LAS NOTAS CON { Y } ---
-        if codigo:
-            if not codigo.upper().startswith("MAIN"):
-                import re
-                notas_ingresadas = re.split(r'[\s,]+', codigo)
-                notas_ingresadas = [n for n in notas_ingresadas if n]
-                
-                instrucciones = []
-                for nota in notas_ingresadas:
-                    instrucciones.append(f"    TOCA {nota}")
-                
-                # Usamos llaves { y } en lugar de INICIO y FIN
-                codigo = "Main\n{\n" + "\n".join(instrucciones) + "\n}"
-        # ----------------------------------------------------
+        # Envoltura automática si el usuario solo pone notas sueltas
+        if codigo and not codigo.upper().startswith("MAIN"):
+            import re
+            notas_ingresadas = re.split(r'[\s,]+', codigo)
+            notas_ingresadas = [n for n in notas_ingresadas if n]
+            
+            instrucciones = []
+            for nota in notas_ingresadas:
+                instrucciones.append(f"    TOCA {nota}")
+            
+            codigo = "Main\n{\n" + "\n".join(instrucciones) + "\n}"
 
         base_path = os.path.join(STATIC_DIR, nombre_cancion)
         
