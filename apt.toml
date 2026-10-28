@@ -1,0 +1,1 @@
+packages = ["lilypond", "timidity", "ffmpeg"]
