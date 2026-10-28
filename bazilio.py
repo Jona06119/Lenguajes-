@@ -6,7 +6,7 @@ from bazilioLexer import bazilioLexer
 from bazilioParser import bazilioParser
 from bazilioVisitor import bazilioVisitor
 
-class BazilioInterpreter(bazilioVisitor):
+class bazilioInterpreter(bazilioVisitor):
     def __init__(self):
         self.procs = {}
         self.call_stack = [{}]
