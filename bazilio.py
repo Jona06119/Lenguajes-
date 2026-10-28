@@ -1,6 +1,7 @@
 import sys
 import os
 import subprocess
+import re
 from antlr4 import *
 from bazilioLexer import bazilioLexer
 from bazilioParser import bazilioParser
@@ -8,101 +9,32 @@ from bazilioVisitor import bazilioVisitor
 
 class bazilioInterpreter(bazilioVisitor):
     def __init__(self):
-        self.procs = {}
-        self.call_stack = [{}]
         self.notas_tocadas = []
+        self.NOTE_MAP = {'A': 0, 'B': 1, 'C': 2, 'D': 3, 'E': 4, 'F': 5, 'G': 6}
 
-    NOTE_MAP = {'A': 0, 'B': 1, 'C': 2, 'D': 3, 'E': 4, 'F': 5, 'G': 6}
-
-    def get_var(self, name):
-        return self.call_stack[-1].get(name, 0)
-
-    def set_var(self, name, val):
-        self.call_stack[-1][name] = val
-
-    def visitPrograma(self, ctx):
-        procs = ctx.procedimiento()
-        if procs:
-            if not isinstance(procs, list):
-                procs = [procs]
-            for proc in procs:
-                proc_name = proc.PROC_ID().getText() if hasattr(proc, 'PROC_ID') and proc.PROC_ID() else "Main"
-                self.procs[proc_name] = proc
-        
-        if 'Main' not in self.procs and self.procs:
-            main_proc = list(self.procs.values())[0]
-            return self.visit(main_proc)
-        elif 'Main' in self.procs:
-            return self.visit(self.procs['Main'])
-        return None
-
-    def visitProcedimiento(self, ctx):
-        bloque = ctx.bloque() if hasattr(ctx, 'bloque') else ctx
-        if bloque is not None:
-            instrucciones = bloque.instruccion() if hasattr(bloque, 'instruccion') else []
-            if instrucciones:
-                if not isinstance(instrucciones, list):
-                    instrucciones = [instrucciones]
-                for stmt in instrucciones:
-                    self.visit(stmt)
-
-    # Método genérico para instrucciones (captura TOCA sin depender de etiquetas)
-    def visitInstruccion(self, ctx):
-        texto_instruccion = ctx.getText().upper()
-        
-        # Si la instrucción es de reproducción (contiene TOCA)
-        if "TOCA" in texto_instruccion or (hasattr(ctx, 'TOCA') and ctx.TOCA() is not None):
-            exprs = ctx.expr() if hasattr(ctx, 'expr') else None
-            if exprs:
-                if isinstance(exprs, list):
-                    for e in exprs:
-                        val = self.visit(e)
-                        if val is not None:
-                            self.notas_tocadas.append(val)
-                else:
-                    val = self.visit(exprs)
-                    if val is not None:
-                        self.notas_tocadas.append(val)
+    def visit(self, tree):
+        if tree is None:
             return
         
-        # Si es asignación
-        elif hasattr(ctx, 'VAR') and ctx.VAR() is not None and hasattr(ctx, 'ASIGN'):
-            var_name = ctx.VAR().getText()
-            val = self.visit(ctx.expr())
-            self.set_var(var_name, val)
-            return
-
-        return self.visitChildren(ctx)
-
-    # Método genérico para expresiones (captura notas, enteros y variables)
-    def visitExpr(self, ctx):
-        # Si es una nota musical
-        if hasattr(ctx, 'NOTA') and ctx.NOTA() is not None:
-            text = ctx.NOTA().getText()
+        # Recorrido recursivo universal por todo el árbol sintáctico
+        if hasattr(tree, 'children') and tree.children:
+            for child in tree.children:
+                self.visit(child)
+        
+        # Extraer texto del nodo actual
+        text = tree.getText() if hasattr(tree, 'getText') else ""
+        
+        # Detectar automáticamente cualquier nota musical (ej: C4, d4, f#4, etc.)
+        if re.match(r'^[a-gA-G][#b]?[0-9]$', text):
             base = text[0].upper()
-            octava = int(text[1]) if len(text) > 1 else 4
-            return (octava * 7) + self.NOTE_MAP.get(base, 0) - 5
-        
-        # Si es un número entero
-        elif hasattr(ctx, 'ENTERO') and ctx.ENTERO() is not None:
-            return int(ctx.ENTERO().getText())
-        
-        # Si es una variable
-        elif hasattr(ctx, 'VAR') and ctx.VAR() is not None:
-            return self.get_var(ctx.VAR().getText())
-        
-        # Operaciones matemáticas básicas
-        elif hasattr(ctx, 'op') and ctx.op is not None:
-            left = self.visit(ctx.left) if hasattr(ctx, 'left') else 0
-            right = self.visit(ctx.right) if hasattr(ctx, 'right') else 0
-            op_type = ctx.op.type
-            if hasattr(bazilioParser, 'MAS') and op_type == bazilioParser.MAS: return left + right
-            if hasattr(bazilioParser, 'MENOS') and op_type == bazilioParser.MENOS: return left - right
-            if hasattr(bazilioParser, 'POR') and op_type == bazilioParser.POR: return left * right
-            if hasattr(bazilioParser, 'ENTRE') and op_type == bazilioParser.ENTRE: return left // right if right != 0 else 0
-            return left + right
-
-        return self.visitChildren(ctx)
+            # Buscar el dígito de la octava
+            match_oct = re.search(r'[0-9]+', text)
+            octava = int(match_oct.group()) if match_oct else 4
+            
+            val = (octava * 7) + self.NOTE_MAP.get(base, 0) - 5
+            self.notas_tocadas.append(val)
+            
+        return super().visit(tree) if hasattr(super(), 'visit') else None
 
 def num_a_lilypond(num):
     octava = (num + 5) // 7
