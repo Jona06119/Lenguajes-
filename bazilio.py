@@ -3,10 +3,10 @@ import os
 import subprocess
 from antlr4 import *
 from BazilioLexer import BazilioLexer
-from BazilioParser import BazilioParser
-from BazilioVisitor import BazilioVisitor
+from bazilioParser import bazilioParser
+from bazilioVisitor import bazilioVisitor
 
-class BazilioInterpreter(BazilioVisitor):
+class BazilioInterpreter(bazilioVisitor):
     def __init__(self):
         self.procs = {}
         self.call_stack = [{}]  # Pila de entornos de variables locales por ámbito
@@ -75,17 +75,17 @@ class BazilioInterpreter(BazilioVisitor):
     def visitExprOpAdd(self, ctx):
         left = self.visit(ctx.left)
         right = self.visit(ctx.right)
-        return left + right if ctx.op.type == BazilioParser.PLUS else left - right
+        return left + right if ctx.op.type == bazilioParser.PLUS else left - right
 
     def visitExprOpMul(self, ctx):
         left = self.visit(ctx.left)
         right = self.visit(ctx.right)
         op = ctx.op.type
-        if op == BazilioParser.MULT: 
+        if op == bazilioParser.MULT: 
             return left * right
-        elif op == BazilioParser.DIV: 
+        elif op == bazilioParser.DIV: 
             return left // right if right != 0 else 0
-        elif op == BazilioParser.MOD: 
+        elif op == bazilioParser.MOD: 
             return left % right if right != 0 else 0
         return 0
 
@@ -93,12 +93,12 @@ class BazilioInterpreter(BazilioVisitor):
         left = self.visit(ctx.left)
         right = self.visit(ctx.right)
         op = ctx.op.type
-        if op == BazilioParser.LTE: return 1 if left <= right else 0
-        if op == BazilioParser.GTE: return 1 if left >= right else 0
-        if op == BazilioParser.LT:  return 1 if left < right else 0
-        if op == BazilioParser.GT:  return 1 if left > right else 0
-        if op == BazilioParser.EQ:  return 1 if left == right else 0
-        if op == BazilioParser.NEQ: return 1 if left != right else 0
+        if op == bazilioParser.LTE: return 1 if left <= right else 0
+        if op == bazilioParser.GTE: return 1 if left >= right else 0
+        if op == bazilioParser.LT:  return 1 if left < right else 0
+        if op == bazilioParser.GT:  return 1 if left > right else 0
+        if op == bazilioParser.EQ:  return 1 if left == right else 0
+        if op == bazilioParser.NEQ: return 1 if left != right else 0
         return 0
 
     def visitExprEntero(self, ctx):
@@ -190,7 +190,7 @@ if __name__ == "__main__":
     input_stream = FileStream(bzl_file, encoding='utf-8')
     lexer = BazilioLexer(input_stream)
     stream = CommonTokenStream(lexer)
-    parser = BazilioParser(stream)
+    parser = bazilioParser(stream)
     tree = parser.program()
     
     interpreter = BazilioInterpreter()
