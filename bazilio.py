@@ -191,7 +191,7 @@ if __name__ == "__main__":
     lexer = bazilioLexer(input_stream)
     stream = CommonTokenStream(lexer)
     parser = bazilioParser(stream)
-    tree = parser.program()
+    tree = parser.programa()
     
     interpreter = bazilioInterpreter()
     interpreter.visit(tree)
