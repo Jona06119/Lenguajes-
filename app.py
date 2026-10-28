@@ -175,11 +175,9 @@ def index():
         nombre_cancion = request.form.get("nombre_cancion", "mi_melodia").strip()
         codigo = request.form.get("codigo", "").strip()
         
-        # --- PERMITE INGRESAR SOLO NOTAS DE MANERA HORIZONTAL O VERTICAL ---
+        # --- ENVUELVE EL CÓDIGO SIN LA PALABRA 'PROC' ---
         if codigo:
-            # Si el usuario no puso la estructura de Bazilio, la construimos automáticamente
-            if not codigo.upper().startswith("PROC"):
-                # Separamos por saltos de línea, espacios o comas para leer todas las notas
+            if not codigo.upper().startswith("MAIN"):
                 import re
                 notas_ingresadas = re.split(r'[\s,]+', codigo)
                 notas_ingresadas = [n for n in notas_ingresadas if n]
@@ -188,9 +186,8 @@ def index():
                 for nota in notas_ingresadas:
                     instrucciones.append(f"    TOCA {nota}")
                 
-                codigo = "PROC Main\nINICIO\n" + "\n".join(instrucciones) + "\nFIN"
-        # ------------------------------------------------------------------
-
+                codigo = "Main\nINICIO\n" + "\n".join(instrucciones) + "\nFIN"
+        # ------------------------------------------------
         # Rutas de salida directas en la carpeta static/
         base_path = os.path.join(STATIC_DIR, nombre_cancion)
         
