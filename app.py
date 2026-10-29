@@ -31,13 +31,14 @@ INDEX_HTML = """
         }
         .container { 
             width: 100%; 
-            max-width: 520px; 
+            max-width: 480px; 
             background: #1e1e1e; 
-            padding: 30px; 
+            padding: 25px; 
             border-radius: 12px; 
             box-shadow: 0 8px 24px rgba(0,0,0,0.5); 
+            box-sizing: border-box;
         }
-        h1 { font-size: 24px; margin-bottom: 25px; font-weight: 700; text-align: center; }
+        h1 { font-size: 26px; margin-bottom: 20px; font-weight: 700; text-align: left; }
         label { display: block; font-size: 14px; margin-bottom: 8px; color: #ccc; }
         input[type="text"], textarea { 
             width: 100%; 
@@ -50,7 +51,7 @@ INDEX_HTML = """
             box-sizing: border-box; 
             margin-bottom: 20px; 
         }
-        textarea { height: 100px; font-family: monospace; resize: vertical; }
+        textarea { height: 120px; font-family: monospace; resize: vertical; }
         input[type="text"]:focus, textarea:focus { border-color: #007bff; outline: none; }
         .btn { 
             background: #222; 
@@ -63,6 +64,7 @@ INDEX_HTML = """
             width: 100%; 
             font-weight: 600;
             transition: background 0.2s;
+            margin-bottom: 15px;
         }
         .btn:hover { background: #333; }
         .success-box { 
@@ -71,35 +73,28 @@ INDEX_HTML = """
             color: #52b788; 
             padding: 12px; 
             border-radius: 8px; 
-            margin-top: 20px; 
+            margin-bottom: 15px; 
             font-size: 14px; 
-            text-align: center;
-        }
-        .results-row {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            margin-top: 20px;
+            text-align: left;
         }
         audio { 
-            flex: 1; 
-            height: 40px;
+            width: 100%; 
+            height: 45px;
             border-radius: 8px; 
+            margin-bottom: 15px;
         }
         .download-btn { 
-            display: flex;
-            align-items: center;
-            justify-content: center;
+            display: block;
+            width: 100%;
+            text-align: center;
             background: #2a2a2a; 
             color: white; 
             border: 1px solid #444; 
-            padding: 0 16px; 
-            height: 40px;
+            padding: 12px 0; 
             border-radius: 8px; 
             text-decoration: none; 
             font-size: 14px; 
             font-weight: 600;
-            white-space: nowrap;
             box-sizing: border-box;
         }
         .download-btn:hover { background: #333; }
@@ -109,7 +104,7 @@ INDEX_HTML = """
             color: #ff8888;
             padding: 12px;
             border-radius: 8px;
-            margin-top: 20px;
+            margin-bottom: 15px;
             font-size: 14px;
             white-space: pre-wrap;
         }
@@ -122,8 +117,8 @@ INDEX_HTML = """
             <label>Nombre de la cancion:</label>
             <input type="text" name="nombre_cancion" value="{{ nombre_cancion or 'mi_melodia' }}" required>
             
-            <label>Escribe tus notas:</label>
-            <textarea name="codigo" placeholder="C4 D4 E4 F4" required>{{ codigo or '' }}</textarea>
+            <label>Escribe tus notas (ej: c4, d4, e4, do#):</label>
+            <textarea name="codigo" placeholder="g4&#10;g4&#10;f4&#10;f4" required>{{ codigo or '' }}</textarea>
             
             <button type="submit" class="btn">Convertir y Generar</button>
         </form>
@@ -140,19 +135,15 @@ INDEX_HTML = """
             </div>
         {% endif %}
 
-        {% if audio_file or pdf_file %}
-            <div class="results-row">
-                {% if audio_file %}
-                    <audio controls autoplay>
-                        <source src="{{ url_for('static', filename=audio_file) }}?t={{ timestamp }}" type="audio/wav">
-                        Tu navegador no soporta el elemento de audio.
-                    </audio>
-                {% endif %}
+        {% if audio_file %}
+            <audio controls>
+                <source src="{{ url_for('static', filename=audio_file) }}?t={{ timestamp }}" type="audio/wav">
+                Tu navegador no soporta el elemento de audio.
+            </audio>
+        {% endif %}
 
-                {% if pdf_file %}
-                    <a href="{{ url_for('static', filename=pdf_file) }}?t={{ timestamp }}" class="download-btn" target="_blank">PDF</a>
-                {% endif %}
-            </div>
+        {% if pdf_file %}
+            <a href="{{ url_for('static', filename=pdf_file) }}?t={{ timestamp }}" class="download-btn" target="_blank">Descargar Partitura PDF</a>
         {% endif %}
     </div>
 </body>
@@ -175,7 +166,6 @@ def index():
         codigo = codigo_usuario
         
         try:
-            # Transformamos automáticamente las notas horizontales a la estructura que requiere el analizador
             if codigo_usuario:
                 notas_ingresadas = re.split(r'[\s,]+', codigo_usuario)
                 notas_ingresadas = [n for n in notas_ingresadas if n]
