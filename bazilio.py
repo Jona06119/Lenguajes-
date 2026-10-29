@@ -58,25 +58,18 @@ def generar_archivos(base_name, notas):
     with open(ly_filename, "w", encoding="utf-8") as f:
         f.write(ly_code)
     
-    # Compilar con LilyPond
-    res_ly = subprocess.run(["lilypond", ly_filename], capture_output=True, text=True)
+    # 1. Generar PDF y MIDI con LilyPond
+    subprocess.run(["lilypond", ly_filename], capture_output=True, text=True)
     
     pdf_filename = f"{base_name}.pdf"
     midi_filename = f"{base_name}.midi"
     wav_filename = f"{base_name}.wav"
     mp3_filename = f"{base_name}.mp3"
     
-    # Convertir MIDI a WAV usando TiMidity con el soundfont del sistema
+    # 2. Convertir MIDI a WAV usando TiMidity
     if os.path.exists(midi_filename):
-        res_timidity = subprocess.run([
-            "timidity", midi_filename, 
-            "-Oj", "-L/usr/share/sounds/sf2", 
-            "-Ow", "-o", wav_filename
-        ], capture_output=True)
+        subprocess.run(["timidity", midi_filename, "-Ow", "-o", wav_filename], capture_output=True)
         
-        if res_timidity.returncode != 0:
-            # Intento alternativo sin ruta explícita si el primero falla
-            subprocess.run(["timidity", midi_filename, "-Ow", "-o", wav_filename], capture_output=True)
-            
+        # 3. Convertir WAV a MP3 con FFmpeg para asegurar compatibilidad total en el navegador
         if os.path.exists(wav_filename):
             subprocess.run(["ffmpeg", "-y", "-i", wav_filename, mp3_filename], capture_output=True)

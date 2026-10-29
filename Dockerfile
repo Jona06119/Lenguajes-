@@ -1,6 +1,6 @@
 FROM python:3.10-slim
 
-# Instalar LilyPond, TiMidity, banco de sonido y fuentes tipográficas
+# Instalar LilyPond, TiMidity, sintetizador y fuentes de texto
 RUN apt-get update && apt-get install -y \
     lilypond \
     timidity \
@@ -8,6 +8,9 @@ RUN apt-get update && apt-get install -y \
     ffmpeg \
     fonts-texgyre \
     && rm -rf /var/lib/apt/lists/*
+
+# Configurar el soundfont por defecto para timidity
+RUN echo "soundfont /usr/share/sounds/sf2/FluidR3_GM.sf2" >> /etc/timidity/timidity.cfg
 
 WORKDIR /app
 
