@@ -137,7 +137,7 @@ INDEX_HTML = """
 
         {% if audio_file %}
             <audio controls>
-                <source src="{{ url_for('static', filename=audio_file) }}?t={{ timestamp }}" type="audio/wav">
+                <source src="{{ url_for('static', filename=audio_file) }}?t={{ timestamp }}" type="audio/mpeg">
                 Tu navegador no soporta el elemento de audio.
             </audio>
         {% endif %}
@@ -191,8 +191,12 @@ def index():
                 base_path = os.path.join(STATIC_DIR, nombre_cancion)
                 generar_archivos(base_path, interpreter.notas_tocadas)
                 
-                if os.path.exists(f"{base_path}.wav"):
+                # Buscamos el MP3 generado para el reproductor de audio
+                if os.path.exists(f"{base_path}.mp3"):
+                    audio_file = f"{nombre_cancion}.mp3"
+                elif os.path.exists(f"{base_path}.wav"):
                     audio_file = f"{nombre_cancion}.wav"
+                    
                 if os.path.exists(f"{base_path}.pdf"):
                     pdf_file = f"{nombre_cancion}.pdf"
                 
